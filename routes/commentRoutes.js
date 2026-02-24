@@ -1,6 +1,6 @@
 const Router = require("express").Router();
 const controller = require("../controller/commentController");
-const { authenticationToken } = require("../middleware/authenticate");
+const { authenticationToken } = require("../middleware/auth.middleware");
 
 Router.get("/all-comments", controller.showAllComment);
 Router.get("/get-comment/:id", controller.getDataByRecipeId);

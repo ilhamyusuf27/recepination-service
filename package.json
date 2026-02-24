@@ -1,23 +1,25 @@
 {
   "dependencies": {
-    "bcrypt": "^5.0.1",
-    "body-parse": "^0.1.0",
-    "body-parser": "^1.20.0",
-    "cloudinary": "^1.30.0",
-    "cors": "^2.8.5",
-    "crypto-js": "^4.1.1",
-    "dotenv": "^16.0.1",
-    "express": "^4.18.1",
-    "helmet": "^5.1.0",
-    "jsonwebtoken": "^8.5.1",
-    "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.7.8",
-    "nodemon": "^2.0.18",
-    "pg": "^8.7.3",
-    "standard": "^17.0.0"
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
+    "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.2",
+    "cloudinary": "^2.9.0",
+    "cors": "^2.8.6",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "2.0.2",
+    "nodemailer": "^8.0.1",
+    "nodemon": "^3.1.14",
+    "pg": "^8.18.0",
+    "standard": "^17.1.2",
+    "zod": "^4.3.6"
   },
-  "name": "rest-api-cafe-bunga",
-  "description": "Tugas REST API",
+  "name": "recepination-service",
+  "description": "Recepination Service",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -26,12 +28,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ilhamyusuf27/rest-api-cafe-bunga.git"
+    "url": "git+https://github.com/ilhamyusuf27/recepination-service.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ilhamyusuf27/rest-api-cafe-bunga/issues"
+    "url": "https://github.com/ilhamyusuf27/recepination-service/issues"
   },
-  "homepage": "https://github.com/ilhamyusuf27/rest-api-cafe-bunga#readme"
+  "homepage": "https://github.com/ilhamyusuf27/recepination-service#readme",
+  "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316",
+  "devDependencies": {
+    "prisma": "^7.4.1"
+  }
 }
