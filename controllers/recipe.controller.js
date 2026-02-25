@@ -1,12 +1,21 @@
 const recipeService = require("../services/recipe.service");
 const { getUserIdFromToken } = require("../utils/jwt");
+const uploadToSupabase = require("../utils/uploadToSupabase");
 
 exports.createRecipe = async (req, res, next) => {
   try {
     const userId = getUserIdFromToken(req);
+
+    let image_url = null;
+
+    if (req.file) {
+      image_url = await uploadToSupabase(req.file, 'recepination-storage', 'recipes');
+    }
+
     const recipeData = {
       ...req.body,
       user_id: userId,
+      image_url,
     };
     const recipe = await recipeService.createRecipe(recipeData);
     res.status(201).json({

@@ -1,11 +1,11 @@
 const prisma = require("../lib/prisma");
 
 const createRecipe = async (data) => {
-  const { title, description, user_id, ingredients, categoryIds } = data;
+  const { title, description, user_id, ingredients, categoryIds, image_url } = data;
 
   return prisma.$transaction(async (tx) => {
     const newRecipe = await tx.recipe.create({
-      data: { title, description, user_id },
+      data: { title, description, user_id, image_url },
     });
 
     if (ingredients?.length) {
