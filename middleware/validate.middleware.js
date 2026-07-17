@@ -1,38 +1,27 @@
-const validate = (schema) => (req, res, next) => {
-  try {
-    const result = schema.safeParse(req.body);
+const AppError = require('../utils/AppError')
 
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: result.error.flatten(),
-      });
-    }
+const isValidImage = (file) => {
+  const bytes = file.buffer
+  if (!bytes?.length) return false
 
-    if (req.file) {
-      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  const webp = bytes.subarray(0, 4).toString() === 'RIFF' && bytes.subarray(8, 12).toString() === 'WEBP'
+  return jpeg || png || webp
+}
 
-      if (!allowedTypes.includes(req.file.mimetype)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid image type",
-        });
-      }
-
-      if (req.file.size > 5 * 1024 * 1024) {
-        return res.status(400).json({
-          success: false,
-          message: "Image too large (max 5MB)",
-        });
-      }
-    }
-
-    req.body = result.data;
-    next();
-  } catch (err) {
-    next(err);
+const validate = (schema, source = 'body') => (req, res, next) => {
+  const result = schema.safeParse(req[source])
+  if (!result.success) {
+    return next(new AppError('Validation error', 400, result.error.flatten()))
   }
-};
 
-module.exports = validate;
+  if (req.file && !isValidImage(req.file)) {
+    return next(new AppError('File content is not a valid JPEG, PNG, or WebP image', 400))
+  }
+
+  req[source] = result.data
+  next()
+}
+
+module.exports = validate

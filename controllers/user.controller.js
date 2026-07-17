@@ -1,192 +1,56 @@
-const userService = require("../services/user.service");
-const bcrypt = require("bcrypt");
+const userService = require('../services/user.service')
+const { uploadToSupabase, deleteFromSupabase } = require('../utils/uploadToSupabase')
+const AppError = require('../utils/AppError')
 
-const getDataUsers = async (req, res, next) => {
+const bucket = 'recepination-storage'
+
+exports.getUsers = async (req, res) => {
+  const result = await userService.getUsers(req.query)
+  res.json({ success: true, ...result })
+}
+
+exports.getMe = async (req, res) => {
+  const user = await userService.getUserById(req.user.user_id)
+  if (!user) throw new AppError('User not found', 404)
+  res.json({ success: true, data: user })
+}
+
+exports.getUser = async (req, res) => {
+  if (req.user.role !== 'ADMIN' && req.user.user_id !== req.params.id) throw new AppError('Forbidden', 403)
+  const user = await userService.getUserById(req.params.id)
+  if (!user) throw new AppError('User not found', 404)
+  res.json({ success: true, data: user })
+}
+
+const update = async (userId, req, res) => {
+  if (!req.file && Object.keys(req.body).length === 0) throw new AppError('At least one field or image is required', 400)
+  const existing = await userService.getUserStorage(userId)
+  if (!existing) throw new AppError('User not found', 404)
+
+  let uploaded
   try {
-    const currentPage = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 5;
-    const skip = (currentPage - 1) * limit;
-
-    const [users, total] = await Promise.all([
-      userService.getAllUsers({ skip, take: limit }),
-      userService.countUsers(),
-    ]);
-
-    res.status(200).json({
-      success: true,
-      total_data: total,
-      page: currentPage,
-      limit,
-      result: users,
-    });
-  } catch (err) {
-    next(err);
+    if (req.file) uploaded = await uploadToSupabase(req.file, bucket, 'users')
+    const user = await userService.updateUser(userId, {
+      ...req.body,
+      ...(uploaded && { photo_profile: uploaded.url, photo_path: uploaded.path })
+    })
+    if (uploaded && existing.photo_path) await deleteFromSupabase(bucket, existing.photo_path)
+    res.json({ success: true, message: 'User updated successfully', data: user })
+  } catch (error) {
+    if (uploaded?.path) await deleteFromSupabase(bucket, uploaded.path)
+    throw error
   }
-};
+}
 
-const getDataById = async (req, res, next) => {
-  try {
-    const user = await userService.getUserById(req.params.id);
+exports.updateMe = (req, res) => update(req.user.user_id, req, res)
+exports.updateUser = (req, res) => update(req.params.id, req, res)
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+const remove = async (userId, res) => {
+  const existing = await userService.getUserStorage(userId)
+  await userService.deleteUser(userId)
+  if (existing?.photo_path) await deleteFromSupabase(bucket, existing.photo_path)
+  res.status(204).send()
+}
 
-    res.json({ success: true, result: user });
-  } catch (err) {
-    next(err);
-  }
-};
-
-const insertNewUser = async (req, res, next) => {
-  try {
-    const { name, phone_number, email, password, rePassword } = req.body;
-
-    if (password.length < 8) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must be at least 8 characters",
-      });
-    }
-
-    if (password !== rePassword) {
-      return res.status(400).json({
-        success: false,
-        message: "Password confirmation does not match",
-      });
-    }
-
-    const existingUser = await userService.getUserByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: "Email already exists",
-      });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await userService.createUser({
-      name: name.trim(),
-      phone_number: phone_number?.trim(),
-      email: email.trim(),
-      password: hashedPassword,
-      photo_profile: req?.file?.path || null,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      result: newUser,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/* =========================
-   UPDATE USER
-========================= */
-const updateUser = async (req, res, next) => {
-  try {
-    const user_id = req.params.id;
-
-    const user = await userService.getUserById(user_id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    let photoUrl = user.photo_profile;
-
-    // if (req?.file?.path) {
-    //   const uploadImage = await cloudinary.uploader.upload(
-    //     req.file.path,
-    //     { folder: "recipe" }
-    //   );
-    //   photoUrl = uploadImage.secure_url;
-    // }
-
-    const updatedUser = await userService.updateUser(user_id, {
-      name: req.body.name ?? user.name,
-      phone_number: req.body.phone_number ?? user.phone_number,
-      email: req.body.email ?? user.email,
-      photo_profile: photoUrl,
-    });
-
-    res.json({
-      success: true,
-      message: "User updated successfully",
-      result: updatedUser,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/* =========================
-   DELETE USER
-========================= */
-const deleteUser = async (req, res, next) => {
-  try {
-    const user_id = req.params.id;
-
-    const user = await userService.getUserById(user_id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    await userService.deleteUser(user_id);
-
-    res.json({
-      success: true,
-      message: "User deleted successfully",
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-/* =========================
-   ROLE VALIDATION
-========================= */
-const userValidation = async (req, res, next) => {
-  try {
-    const user = await userService.getUserById(req.body.user_id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    if (user.role === "user") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
-
-    next();
-  } catch (err) {
-    next(err);
-  }
-};
-
-module.exports = {
-  getDataUsers,
-  getDataById,
-  updateUser,
-  deleteUser,
-  insertNewUser,
-  userValidation,
-};
+exports.deleteMe = (req, res) => remove(req.user.user_id, res)
+exports.deleteUser = (req, res) => remove(req.params.id, res)

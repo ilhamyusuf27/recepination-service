@@ -1,17 +1,6 @@
-const jwt = require("jsonwebtoken");
-
 const getUserIdFromToken = (req) => {
-  const authHeader = req.headers.authorization;
+  if (!req.user?.user_id) throw new Error('Authentication middleware must run first')
+  return req.user.user_id
+}
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    throw new Error("Invalid authorization format");
-  }
-
-  const token = authHeader.split(" ")[1];
-
-  const decoded = jwt.verify(token, process.env.SECRET_KEY);
-
-  return decoded.user_id;
-};
-
-module.exports = { getUserIdFromToken };
+module.exports = { getUserIdFromToken }

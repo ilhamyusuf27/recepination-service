@@ -1,172 +1,135 @@
-const prisma = require("../lib/prisma");
+const prisma = require('../lib/prisma')
+const AppError = require('../utils/AppError')
+const { parsePagination } = require('../utils/pagination')
 
-const createRecipe = async (data) => {
-  const { title, description, user_id, ingredients, categoryIds, image_url } = data;
+const recipeListInclude = {
+  user: { select: { user_id: true, name: true, photo_profile: true } },
+  categories: { include: { category: true } },
+  _count: { select: { favorites: true, comments: true } }
+}
 
-  return prisma.$transaction(async (tx) => {
-    const newRecipe = await tx.recipe.create({
-      data: { title, description, user_id, image_url },
-    });
+const assertOwner = async (recipeId, actor, tx = prisma) => {
+  const recipe = await tx.recipe.findUnique({
+    where: { recipe_id: recipeId },
+    select: { recipe_id: true, user_id: true, image_path: true }
+  })
+  if (!recipe) throw new AppError('Recipe not found', 404)
+  if (actor.role !== 'ADMIN' && recipe.user_id !== actor.user_id) throw new AppError('Forbidden', 403)
+  return recipe
+}
 
-    if (ingredients?.length) {
-      await tx.ingredient.createMany({
-        data: ingredients.map((item) => ({
-          recipeId: newRecipe.recipe_id,
-          name: item.name,
-          quantity: item.quantity,
-        })),
-      });
+const createRecipe = async (data, userId) => prisma.$transaction(async (tx) => {
+  const recipe = await tx.recipe.create({
+    data: {
+      user_id: userId,
+      title: data.title,
+      description: data.description,
+      instructions: data.instructions,
+      image_url: data.image_url || null,
+      image_path: data.image_path || null
     }
+  })
 
-    if (categoryIds?.length) {
-      await tx.recipeCategory.createMany({
-        data: categoryIds.map((id) => ({
-          recipeId: newRecipe.recipe_id,
-          categoryId: id,
-        })),
-      });
-    }
-
-    return newRecipe;
-  });
-};
-
-const getRecipes = async ({ page = 1, limit = 10, search, categoryId }) => {
-  const skip = (page - 1) * limit;
-
-  const whereClause = {
-    ...(search && {
-      title: { contains: search, mode: "insensitive" },
-    }),
-    ...(categoryId && {
-      categories: { some: { categoryId } },
-    }),
-  };
-
-  const [recipes, total] = await Promise.all([
-    prisma.recipe.findMany({
-      where: whereClause,
-      skip: Number(skip),
-      take: Number(limit),
-      include: {
-        user: { select: { name: true } },
-        _count: {
-          select: { favorites: true, comments: true },
-        },
-      },
-      orderBy: { created_at: "desc" },
-    }),
-    prisma.recipe.count({ where: whereClause }),
-  ]);
-
-  return {
-    data: recipes,
-    meta: {
-      total,
-      page: Number(page),
-      totalPages: Math.ceil(total / limit),
-    },
-  };
-};
-
-const getRecipeDetail = async (id) => {
-  return prisma.recipe.findUnique({
-    where: { recipe_id: id },
-    include: {
-      user: { select: { name: true, photo_profile: true } },
-      ingredients: true,
-      comments: {
-        include: { user: { select: { name: true } } },
-        orderBy: { created_at: "desc" },
-      },
-      categories: { include: { category: true } },
-      _count: {
-        select: { favorites: true, comments: true },
-      },
-    },
-  });
-};
-
-const updateRecipe = async (recipeId, data) => {
-  const { title, description, ingredients, categoryIds } = data;
-
-  return prisma.$transaction(async (tx) => {
-    const recipe = await tx.recipe.update({
-      where: { recipe_id: recipeId },
-      data: { title, description },
-    });
-
-    await tx.ingredient.deleteMany({ where: { recipeId } });
-
-    if (ingredients?.length) {
-      await tx.ingredient.createMany({
-        data: ingredients.map((item) => ({
-          recipeId,
-          name: item.name,
-          quantity: item.quantity,
-        })),
-      });
-    }
-
-    await tx.recipeCategory.deleteMany({ where: { recipeId } });
-
-    if (categoryIds?.length) {
-      await tx.recipeCategory.createMany({
-        data: categoryIds.map((id) => ({
-          recipeId,
-          categoryId: id,
-        })),
-      });
-    }
-
-    return recipe;
-  });
-};
-
-const deleteRecipe = async (id) => {
-  return prisma.recipe.delete({
-    where: { recipe_id: id },
-  });
-};
-
-const toggleFavorite = async (userId, recipeId) => {
-  const existing = await prisma.favorite.findFirst({
-    where: { userId, recipeId },
-  });
-
-  if (existing) {
-    await prisma.favorite.delete({
-      where: { id: existing.id },
-    });
-    return { message: "Favorite removed" };
+  if (data.ingredients.length) {
+    await tx.ingredient.createMany({
+      data: data.ingredients.map((item, index) => ({
+        recipeId: recipe.recipe_id,
+        name: item.name,
+        quantity: item.quantity || null,
+        position: index + 1
+      }))
+    })
   }
 
-  await prisma.favorite.create({
-    data: { userId, recipeId },
-  });
+  if (data.categoryIds.length) {
+    await tx.recipeCategory.createMany({
+      data: data.categoryIds.map((categoryId) => ({ recipeId: recipe.recipe_id, categoryId }))
+    })
+  }
 
-  return { message: "Recipe favorited" };
-};
+  return tx.recipe.findUnique({ where: { recipe_id: recipe.recipe_id }, include: recipeListInclude })
+})
 
-const getPopularRecipes = async () => {
-  return prisma.recipe.findMany({
-    include: {
-      _count: { select: { favorites: true } },
-      user: { select: { name: true } },
-    },
-    orderBy: {
-      favorites: { _count: "desc" },
-    },
-    take: 10,
-  });
-};
+const getRecipes = async (query, userId) => {
+  const { page, limit, skip } = parsePagination(query)
+  const where = {
+    ...(userId && { user_id: userId }),
+    ...(query.search && {
+      OR: [
+        { title: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
+        { ingredients: { some: { name: { contains: query.search, mode: 'insensitive' } } } }
+      ]
+    }),
+    ...(query.categoryId && { categories: { some: { categoryId: query.categoryId } } })
+  }
 
-module.exports = {
-  createRecipe,
-  getRecipes,
-  getRecipeDetail,
-  updateRecipe,
-  deleteRecipe,
-  toggleFavorite,
-  getPopularRecipes,
-};
+  const orderBy = query.sort === 'popular'
+    ? { favorites: { _count: 'desc' } }
+    : { created_at: query.sort === 'oldest' ? 'asc' : 'desc' }
+
+  const [data, total] = await Promise.all([
+    prisma.recipe.findMany({ where, skip, take: limit, include: recipeListInclude, orderBy }),
+    prisma.recipe.count({ where })
+  ])
+  return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } }
+}
+
+const getRecipeDetail = async (id) => prisma.recipe.findUnique({
+  where: { recipe_id: id },
+  include: {
+    ...recipeListInclude,
+    ingredients: { orderBy: { position: 'asc' } }
+  }
+})
+
+const updateRecipe = async (recipeId, data, actor) => prisma.$transaction(async (tx) => {
+  const existing = await assertOwner(recipeId, actor, tx)
+  await tx.recipe.update({
+    where: { recipe_id: recipeId },
+    data: {
+      title: data.title,
+      description: data.description,
+      instructions: data.instructions,
+      image_url: data.image_url,
+      image_path: data.image_path
+    }
+  })
+
+  if (data.ingredients !== undefined) {
+    await tx.ingredient.deleteMany({ where: { recipeId } })
+    if (data.ingredients.length) {
+      await tx.ingredient.createMany({
+        data: data.ingredients.map((item, index) => ({
+          recipeId,
+          name: item.name,
+          quantity: item.quantity || null,
+          position: index + 1
+        }))
+      })
+    }
+  }
+
+  if (data.categoryIds !== undefined) {
+    await tx.recipeCategory.deleteMany({ where: { recipeId } })
+    if (data.categoryIds.length) {
+      await tx.recipeCategory.createMany({
+        data: data.categoryIds.map((categoryId) => ({ recipeId, categoryId }))
+      })
+    }
+  }
+
+  const recipe = await tx.recipe.findUnique({
+    where: { recipe_id: recipeId },
+    include: { ...recipeListInclude, ingredients: { orderBy: { position: 'asc' } } }
+  })
+  return { recipe, previousImagePath: existing.image_path }
+})
+
+const deleteRecipe = async (id, actor) => prisma.$transaction(async (tx) => {
+  const existing = await assertOwner(id, actor, tx)
+  await tx.recipe.delete({ where: { recipe_id: id } })
+  return existing
+})
+
+module.exports = { assertOwner, createRecipe, getRecipes, getRecipeDetail, updateRecipe, deleteRecipe }

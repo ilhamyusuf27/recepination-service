@@ -1,47 +1,43 @@
-const prisma = require("../lib/prisma");
-const AppError = require("../utils/AppError");
+const prisma = require('../lib/prisma')
+const AppError = require('../utils/AppError')
 
 const createCategory = async (data) => {
   const existing = await prisma.category.findUnique({
-    where: { name: data.name },
-  });
+    where: { name: data.name }
+  })
 
   if (existing) {
-    const error = new AppError("Category already exists");
-    error.status = 409;
-    throw error;
+    throw new AppError('Category already exists', 409)
   }
 
   return prisma.category.create({
-    data: { name: data.name },
-  });
-};
+    data: { name: data.name }
+  })
+}
 
 const getCategories = async () => {
   return prisma.category.findMany({
     include: {
       _count: {
-        select: { recipes: true },
-      },
+        select: { recipes: true }
+      }
     },
-    orderBy: { created_at: "desc" },
-  });
-};
+    orderBy: { created_at: 'desc' }
+  })
+}
 
 const getCategoryDetail = async (
   categoryId,
   { page = 1, limit = 10, search }
 ) => {
-  const skip = (page - 1) * limit;
+  const skip = (page - 1) * limit
 
   const category = await prisma.category.findUnique({
-    where: { category_id: categoryId },
-  });
+    where: { category_id: categoryId }
+  })
 
   if (!category) {
-    const error = new AppError("Category not found");
-    error.status = 404;
-    throw error;
+    throw new AppError('Category not found', 404)
   }
 
   const recipes = await prisma.recipeCategory.findMany({
@@ -51,10 +47,10 @@ const getCategoryDetail = async (
         recipe: {
           title: {
             contains: search,
-            mode: "insensitive",
-          },
-        },
-      }),
+            mode: 'insensitive'
+          }
+        }
+      })
     },
     skip: Number(skip),
     take: Number(limit),
@@ -63,16 +59,19 @@ const getCategoryDetail = async (
         include: {
           user: { select: { name: true } },
           _count: {
-            select: { favorites: true, comments: true },
-          },
-        },
-      },
-    },
-  });
+            select: { favorites: true, comments: true }
+          }
+        }
+      }
+    }
+  })
 
   const total = await prisma.recipeCategory.count({
-    where: { categoryId },
-  });
+    where: {
+      categoryId,
+      ...(search && { recipe: { title: { contains: search, mode: 'insensitive' } } })
+    }
+  })
 
   return {
     category,
@@ -80,62 +79,58 @@ const getCategoryDetail = async (
     meta: {
       total,
       page: Number(page),
-      totalPages: Math.ceil(total / limit),
-    },
-  };
-};
+      totalPages: Math.ceil(total / limit)
+    }
+  }
+}
 
 const updateCategory = async (categoryId, data) => {
   return prisma.category.update({
     where: { category_id: categoryId },
-    data: { name: data.name },
-  });
-};
+    data: { name: data.name }
+  })
+}
 
 const deleteCategory = async (categoryId) => {
   const used = await prisma.recipeCategory.count({
-    where: { categoryId },
-  });
+    where: { categoryId }
+  })
 
   if (used > 0) {
-    const error = new AppError(
-      "Cannot delete category because it is used by recipes"
-    );
-    error.status = 400;
-    throw error;
+    throw new AppError('Cannot delete category because it is used by recipes', 400)
   }
 
   return prisma.category.delete({
-    where: { category_id: categoryId },
-  });
-};
+    where: { category_id: categoryId }
+  })
+}
 
 const attachRecipe = async (categoryId, recipeId) => {
   return prisma.recipeCategory.create({
-    data: { categoryId, recipeId },
-  });
-};
+    data: { categoryId, recipeId }
+  })
+}
 
 const detachRecipe = async (categoryId, recipeId) => {
   return prisma.recipeCategory.delete({
     where: {
       recipeId_categoryId: {
         recipeId,
-        categoryId,
-      },
-    },
-  });
-};
+        categoryId
+      }
+    }
+  })
+}
 
 const bulkAttachRecipes = async (categoryId, recipeIds) => {
   return prisma.recipeCategory.createMany({
     data: recipeIds.map((id) => ({
       categoryId,
-      recipeId: id,
+      recipeId: id
     })),
-    skipDuplicates: true,
-  });
-};
+    skipDuplicates: true
+  })
+}
 
 module.exports = {
   createCategory,
@@ -145,5 +140,5 @@ module.exports = {
   deleteCategory,
   attachRecipe,
   detachRecipe,
-  bulkAttachRecipes,
-};
+  bulkAttachRecipes
+}

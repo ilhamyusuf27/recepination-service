@@ -4,19 +4,14 @@
     "@prisma/client": "^7.4.1",
     "@supabase/supabase-js": "^2.97.0",
     "bcrypt": "^6.0.0",
-    "body-parser": "^2.2.2",
-    "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
-    "crypto-js": "^4.2.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "2.0.2",
     "nodemailer": "^8.0.1",
-    "nodemon": "^3.1.14",
     "pg": "^8.18.0",
-    "standard": "^17.1.2",
     "zod": "^4.3.6"
   },
   "name": "recepination-service",
@@ -24,8 +19,14 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "standard && node my-tests.js",
-    "start": "node index.js"
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "lint": "standard",
+    "test": "node --test tests/*.test.js",
+    "test:db": "node --test tests/integration/*.test.js",
+    "seed": "node prisma/seed.js",
+    "prisma:validate": "prisma validate",
+    "check": "pnpm prisma:validate && pnpm lint && pnpm test"
   },
   "repository": {
     "type": "git",
@@ -39,6 +40,8 @@
   "homepage": "https://github.com/ilhamyusuf27/recepination-service#readme",
   "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316",
   "devDependencies": {
-    "prisma": "^7.4.1"
+    "nodemon": "^3.1.14",
+    "prisma": "^7.4.1",
+    "standard": "^17.1.2"
   }
 }

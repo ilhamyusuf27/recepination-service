@@ -1,209 +1,63 @@
-# Recipenation-BackEnd
+# Recepination Service
 
-<div id="top"></div>
+Production-oriented REST API for the Recepination recipe application. It uses Express 5, PostgreSQL, Prisma, JWT access tokens, rotating refresh tokens, Zod validation, Supabase Storage, and Nodemailer.
 
-<!-- PROJECT LOGO -->
-<br />
-<div align="center">
-  <a href="">
-    <img src="https://res.cloudinary.com/dbi5h4hdg/image/upload/v1661404167/porto/Recipenation/logo_qrorgc.svg" alt="Logo" width="150px">
-  </a>
+## Requirements
 
-  <h3 align="center">Recipenation BackEnd</h3>
+- Node.js 22+
+- pnpm 10+
+- PostgreSQL
+- Supabase Storage bucket named `recepination-storage` when image uploads are enabled
+- SMTP credentials unless development verification bypass is explicitly enabled
 
-  <p align="center">
-    Create a Node.js app for building Recipenation RESTful APIs using Express.
-    <br />
-    <a href="#table-of-contents"><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="https://recipenation-app.herokuapp.com">View Web Service</a>
-    ·
-    <a href="https://github.com/ilhamyusuf27/rest-api-cafe-bunga/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/ilhamyusuf27/rest-api-cafe-bunga/issues">Request Feature</a>
-  </p>
+## Local setup
 
-</div>
-
-<!-- TABLE OF CONTENTS -->
-
-## Table of Contents
-
-<details>
-  <summary>Table of Contents</summary>
-  <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#requirements">Requirements</a></li>
-        <li><a href="#installation">Installation</a></li>
-        <li><a href="#setup-env-example">Setup .env example</a></li>
-      </ul>
-    </li>
-    <li><a href="#rest-api">REST API</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#related-project">Related Project</a></li>
-    <li><a href="#contributing">Contributing</a></li>
-    <li><a href="#our-team">Contact</a></li>
-    <li><a href="#license">License</a></li>
-  </ol>
-</details>
-
-<!-- ABOUT THE PROJECT -->
-
-## About The Project
-
-Create a Node.js app for building MyCareer RESTful APIs using Express.
-
-### Built With
-
-This app was built with some technologies below:
-
-- [Node.js](https://nodejs.org/en/)
-- [Express.js](https://expressjs.com/)
-- [JSON Web Tokens](https://jwt.io/)
-- [PostgreSQL](https://www.postgresql.org/)
-- and other
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-<!-- GETTING STARTED -->
-
-## Getting Started
-
-### Prerequisites
-
-This is an example of how to list things you need to use the software and how to install them.
-
-- [Node.js](https://nodejs.org/en/download/)
-
-### Requirements
-
-- [Node.js](https://nodejs.org/en/)
-- [Postman](https://www.getpostman.com/) for testing
-- [Database](https://www.postgresql.org/)
-
-### Installation
-
-- Clone the Repo
-
-```
-git clone https://github.com/ilhamyusuf27/rest-api-cafe-bunga.git
+```bash
+cp .env.example .env
+pnpm install
+pnpm prisma generate
+pnpm prisma migrate dev
+pnpm dev
 ```
 
-- Go To Folder Repo
+The API listens on `http://localhost:8000` by default. Versioned endpoints live under `/api/v1`. Liveness and database readiness checks are available at `/health` and `/ready`.
 
-```
-cd bypass-back-end
-```
+For local-only development without SMTP, set `SKIP_EMAIL_VERIFICATION=true`. The service refuses this bypass in production.
 
-- Install Module
+## Commands
 
-```
-npm install
-```
-
-- Make a new database
-- <a href="#setup-env-example">Setup .env</a>
-- Type ` npm run dev` To Start Development
-- Type ` npm run start` To Start Production
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-### Setup .env example
-
-Create .env file in your root project folder.
-
-```env
-# app
-PORT_LOCAL=
-ENV_MODE=
-DB_URI=
-
-# database
-DB_USER=
-DB_HOST=
-DB_NAME=
-DB_PASS=
-DB_PORT=
-
-# cloudinary
-CLOUD_NAME=
-CLOUD_KEY=
-CLOUD_SECRET=
-
-# jwt
-SECRET_KEY=
-
-# email
-EMAIL=
-PASS_EMAIL=
+```bash
+pnpm dev
+pnpm start
+pnpm test
+pnpm lint
+pnpm prisma:validate
+pnpm check
 ```
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+## Authentication
 
-## REST API
+Login returns a short-lived JWT access token and a rotating opaque refresh token. Send the access token as `Authorization: Bearer <token>`. Store refresh tokens securely and replace the old token every time `/api/v1/auth/refresh-token` succeeds.
 
-You can view my Postman collection [here]()
-</br>
-[![Run in Postman](https://run.pstmn.io/button.svg)](https://documenter.getpostman.com/view/20805281/VUr1GXwD)
+User identity is always derived from the verified access token. Clients must not send a `userId` to perform actions on behalf of another user.
 
-<p align="right">(<a href="#top">back to top</a>)</p>
+## API contract
 
-<!-- CONTRIBUTING -->
+The OpenAPI source is [docs/openapi.yaml](docs/openapi.yaml). Successful collection responses use:
 
-## Contributing
+```json
+{
+  "success": true,
+  "data": [],
+  "meta": { "total": 0, "page": 1, "limit": 10, "totalPages": 0 }
+}
+```
 
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Errors include a request ID that also appears in server logs.
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+## Production notes
 
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-## Related Project
-
-:rocket: [`Backend Recipenation`](https://github.com/ilhamyusuf27/rest-api-cafe-bunga)
-
-:rocket: [`Frontend Recipenation`](https://github.com/ilhamyusuf27/recipenation-next-js)
-
-:rocket: [`API`](https://recipenation-app.herokuapp.com)
-
-:rocket: [`Demo Recipenation`](https://recipenation.vercel.app/)
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-## Our Team
-
-<center>
-  <table>
-        <tr>
-      <td align="center">
-        <a href="https://github.com/ilhamyusuf27">
-          <img width="100" src="https://avatars.githubusercontent.com/u/43610978?s=400&u=76c4f9fc270cb7cb6e82570927b32973161aa970&v=4" alt="Fandi"><br/>
-          <sub><b>Ilham Yusuf Alghani</b></sub> <br/>
-          <sub>Fullstack Website Developer</sub>
-        </a>
-      </td>
-    <tr>
-  </table>
-</center>
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-## License
-
-Distributed under the [MIT](/LICENSE) License.
-
-<p align="right">(<a href="#top">back to top</a>)</p>
+- Run `prisma migrate deploy` before starting a new release.
+- Use a long random `SECRET_KEY` and never expose the Supabase service-role key to the browser.
+- Use a shared rate-limit store such as Redis when deploying multiple API instances; the included limiter is process-local.
+- Forward `SIGTERM` during deployments so the HTTP server and Prisma connection close cleanly.

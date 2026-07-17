@@ -1,12 +1,18 @@
-const multer = require("multer");
+const multer = require('multer')
 
-const storage = multer.memoryStorage();
+const storage = multer.memoryStorage()
 
 const upload = multer({
-  storage: storage,
+  storage,
   limits: {
-    fileSize: 1024 * 1024 * 5,
+    fileSize: 5 * 1024 * 1024,
+    files: 1,
+    fields: 30
   },
-});
+  fileFilter: (req, file, callback) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp']
+    callback(allowed.includes(file.mimetype) ? null : new Error('Invalid image type'), allowed.includes(file.mimetype))
+  }
+})
 
-module.exports = upload;
+module.exports = upload

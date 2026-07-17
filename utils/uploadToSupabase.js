@@ -1,28 +1,26 @@
-const supabase = require("../lib/supabase");
-const path = require("path");
+const crypto = require('crypto')
+const path = require('path')
+const getSupabase = require('../lib/supabase')
+const AppError = require('./AppError')
 
-const uploadToSupabase = async (file, bucketName, folderName = "public") => {
-  const fileExt = path.extname(file.originalname);
-  const fileName = `${Date.now()}-${Math.random()
-    .toString(36)
-    .substring(2)}${fileExt}`;
+const uploadToSupabase = async (file, bucketName, folderName = 'public') => {
+  const fileExt = path.extname(file.originalname).toLowerCase()
+  const storagePath = `${folderName}/${crypto.randomUUID()}${fileExt}`
+  const supabase = getSupabase()
+  const { error } = await supabase.storage.from(bucketName).upload(storagePath, file.buffer, {
+    contentType: file.mimetype,
+    upsert: false
+  })
+  if (error) throw new AppError('Unable to upload image', 502)
 
-  const { error } = await supabase.storage
-    .from(bucketName)
-    .upload(`${folderName}/${fileName}`, file.buffer, {
-      contentType: file.mimetype,
-    });
+  const { data } = supabase.storage.from(bucketName).getPublicUrl(storagePath)
+  return { url: data.publicUrl, path: storagePath }
+}
 
-  if (error) {
-    console.log("Supabase error:", error);
-    throw new Error(error.message);
-  }
+const deleteFromSupabase = async (bucketName, storagePath) => {
+  if (!storagePath) return
+  const { error } = await getSupabase().storage.from(bucketName).remove([storagePath])
+  if (error) console.error(JSON.stringify({ level: 'warn', message: 'Unable to delete stored image', storagePath }))
+}
 
-  const { data } = supabase.storage
-    .from(bucketName)
-    .getPublicUrl(fileName);
-
-  return data.publicUrl;
-};
-
-module.exports = uploadToSupabase;
+module.exports = { uploadToSupabase, deleteFromSupabase }

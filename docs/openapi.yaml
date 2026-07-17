@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: Recepination API
+  version: 1.1.0
+servers:
+  - url: http://localhost:8000/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /auth/register:
+    post:
+      security: []
+      summary: Register an account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201': { description: Account created }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /auth/login:
+    post:
+      security: []
+      summary: Create an access and refresh token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Authenticated }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/refresh-token:
+    post:
+      security: []
+      summary: Rotate a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200': { description: New token pair }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /users/me:
+    get:
+      summary: Get the authenticated user
+      responses:
+        '200': { description: User profile }
+    patch:
+      summary: Update the authenticated user
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                phone_number: { type: string }
+                image: { type: string, format: binary }
+      responses:
+        '200': { description: Updated user }
+    delete:
+      summary: Delete the authenticated account
+      responses:
+        '204': { description: Deleted }
+  /recipes:
+    get:
+      security: []
+      summary: Search and list recipes
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { in: query, name: search, schema: { type: string } }
+        - { in: query, name: categoryId, schema: { type: string, format: uuid } }
+        - { in: query, name: sort, schema: { type: string, enum: [newest, oldest, popular] } }
+      responses:
+        '200': { description: Paginated recipes }
+    post:
+      summary: Create a recipe owned by the authenticated user
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecipeInput'
+      responses:
+        '201': { description: Recipe created }
+  /recipes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      security: []
+      summary: Get a recipe
+      responses:
+        '200': { description: Recipe }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Update an owned recipe
+      responses:
+        '200': { description: Recipe updated }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      summary: Delete an owned recipe
+      responses:
+        '204': { description: Deleted }
+  /comments:
+    post:
+      summary: Add a comment or one-level reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content, recipeId]
+              properties:
+                content: { type: string, maxLength: 2000 }
+                recipeId: { type: string, format: uuid }
+                parentId: { type: string, format: uuid }
+      responses:
+        '201': { description: Comment created }
+  /favorites/me:
+    get:
+      summary: List the authenticated user's favorites
+      responses:
+        '200': { description: Paginated favorite recipes }
+  /favorites:
+    post:
+      summary: Favorite a recipe
+      responses:
+        '201': { description: Favorited }
+    delete:
+      summary: Remove a favorite
+      responses:
+        '204': { description: Removed }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Id:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    RegisterInput:
+      type: object
+      required: [name, email, password, rePassword]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 100 }
+        phone_number: { type: string, nullable: true }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        rePassword: { type: string }
+    RecipeInput:
+      type: object
+      required: [title, description, instructions]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 200 }
+        description: { type: string, minLength: 5, maxLength: 10000 }
+        instructions:
+          type: array
+          items: { type: string }
+        ingredients:
+          type: array
+          items:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string }
+              quantity: { type: string, nullable: true }
+        categoryIds:
+          type: array
+          items: { type: string, format: uuid }
+        image: { type: string, format: binary }
+    Error:
+      type: object
+      required: [success, message]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        requestId: { type: string }
+  responses:
+    Unauthorized:
+      description: Authentication failed
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: Insufficient permissions
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Resource not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: Resource already exists
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

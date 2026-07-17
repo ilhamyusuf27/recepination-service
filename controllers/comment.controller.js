@@ -1,61 +1,21 @@
-const commentService = require("../services/comment.service");
+const commentService = require('../services/comment.service')
 
-exports.createComment = async (req, res, next) => {
-  try {
-    const comment = await commentService.createComment(req.body);
+exports.createComment = async (req, res) => {
+  const comment = await commentService.createComment(req.body, req.user.user_id)
+  res.status(201).json({ success: true, message: 'Comment created', data: comment })
+}
 
-    res.status(201).json({
-      success: true,
-      message: "Comment created",
-      data: comment,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.getCommentsByRecipe = async (req, res) => {
+  const result = await commentService.getCommentsByRecipe(req.params.recipeId, req.query)
+  res.json({ success: true, ...result })
+}
 
-exports.getCommentsByRecipe = async (req, res, next) => {
-  try {
-    const result = await commentService.getCommentsByRecipe(
-      req.params.recipeId,
-      req.query
-    );
+exports.updateComment = async (req, res) => {
+  const comment = await commentService.updateComment(req.params.id, req.body, req.user)
+  res.json({ success: true, message: 'Comment updated', data: comment })
+}
 
-    res.json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.deleteComment = async (req, res, next) => {
-  try {
-    const { userId } = req.body;
-
-    await commentService.deleteComment(
-      req.params.id,
-      userId
-    );
-
-    res.json({
-      success: true,
-      message: "Comment deleted",
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.countComments = async (req, res, next) => {
-  try {
-    const total = await commentService.countComments(
-      req.params.recipeId
-    );
-
-    res.json({
-      success: true,
-      total,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.deleteComment = async (req, res) => {
+  await commentService.deleteComment(req.params.id, req.user)
+  res.status(204).send()
+}

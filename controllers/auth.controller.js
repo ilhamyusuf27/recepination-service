@@ -1,66 +1,47 @@
-const authService = require("../services/auth.service");
+const authService = require('../services/auth.service')
 
-exports.login = async (req, res, next) => {
-  try {
-    const result = await authService.login(req.body);
+exports.login = async (req, res) => {
+  const result = await authService.login(req.body)
+  res.json({ success: true, message: 'Login successful', data: result })
+}
 
-    res.json({
-      success: true,
-      message: "Login successful",
-      token: result.token,
-      data: result.user,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.register = async (req, res) => {
+  const user = await authService.register(req.body)
+  res.status(201).json({
+    success: true,
+    message: user.is_verified
+      ? 'Account created successfully'
+      : 'Account created successfully. Please check your email for verification.',
+    data: user
+  })
+}
 
-exports.register = async (req, res, next) => {
-  try {
-    const user = await authService.register(
-      req.body,
-      req.headers.host
-    );
+exports.verifyEmail = async (req, res) => {
+  const user = await authService.verifyEmail(req.query.token)
+  res.json({ success: true, message: 'Email successfully verified', data: user })
+}
 
-    res.status(201).json({
-      success: true,
-      message:
-        "Account created successfully. Please check your email for verification.",
-      data: user,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.resendVerification = async (req, res) => {
+  await authService.resendVerification(req.body.email)
+  res.json({ success: true, message: 'If the account requires verification, an email has been sent.' })
+}
 
-exports.verifyEmail = async (req, res, next) => {
-  try {
-    const result = await authService.verifyEmail(req.query.token);
+exports.refreshToken = async (req, res) => {
+  const session = await authService.refreshSession(req.body.refreshToken)
+  res.json({ success: true, data: session })
+}
 
-    res.json({
-      success: true,
-      message: "Email successfully verified",
-      data: result,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.logout = async (req, res) => {
+  await authService.logout(req.body.refreshToken)
+  res.status(204).send()
+}
 
-exports.refreshToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : null;
+exports.forgotPassword = async (req, res) => {
+  await authService.forgotPassword(req.body.email)
+  res.json({ success: true, message: 'If that account exists, a reset email has been sent.' })
+}
 
-    const newToken = await authService.refreshToken(token);
-
-    res.json({
-      success: true,
-      token: newToken,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.resetPassword = async (req, res) => {
+  await authService.resetPassword(req.body)
+  res.json({ success: true, message: 'Password reset successfully. Please sign in again.' })
+}

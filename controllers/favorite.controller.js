@@ -1,84 +1,26 @@
-const favoriteService = require("../services/favorite.service");
+const favoriteService = require('../services/favorite.service')
 
-exports.addFavorite = async (req, res, next) => {
-  try {
-    const { userId, recipeId } = req.body;
+exports.addFavorite = async (req, res) => {
+  const data = await favoriteService.addFavorite(req.user.user_id, req.body.recipeId)
+  res.status(201).json({ success: true, message: 'Recipe favorited', data })
+}
 
-    const result = await favoriteService.addFavorite(
-      userId,
-      recipeId
-    );
+exports.removeFavorite = async (req, res) => {
+  await favoriteService.removeFavorite(req.user.user_id, req.body.recipeId)
+  res.status(204).send()
+}
 
-    res.status(201).json({
-      success: true,
-      message: "Recipe favorited",
-      data: result,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.toggleFavorite = async (req, res) => {
+  const data = await favoriteService.toggleFavorite(req.user.user_id, req.body.recipeId)
+  res.json({ success: true, data })
+}
 
-exports.removeFavorite = async (req, res, next) => {
-  try {
-    const { userId, recipeId } = req.body;
+exports.getMyFavorites = async (req, res) => {
+  const result = await favoriteService.getFavoritesByUser(req.user.user_id, req.query)
+  res.json({ success: true, ...result })
+}
 
-    await favoriteService.removeFavorite(userId, recipeId);
-
-    res.json({
-      success: true,
-      message: "Favorite removed",
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.toggleFavorite = async (req, res, next) => {
-  try {
-    const { userId, recipeId } = req.body;
-
-    const result = await favoriteService.toggleFavorite(
-      userId,
-      recipeId
-    );
-
-    res.json({
-      success: true,
-      status: result.status,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.getFavoritesByUser = async (req, res, next) => {
-  try {
-    const result = await favoriteService.getFavoritesByUser(
-      req.params.userId,
-      req.query
-    );
-
-    res.json({ success: true, ...result });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.isFavorited = async (req, res, next) => {
-  try {
-    const { userId, recipeId } = req.query;
-
-    const isFav = await favoriteService.isFavorited(
-      userId,
-      recipeId
-    );
-
-    res.json({
-      success: true,
-      isFavorited: isFav,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+exports.isFavorited = async (req, res) => {
+  const isFavorited = await favoriteService.isFavorited(req.user.user_id, req.query.recipeId)
+  res.json({ success: true, data: { isFavorited } })
+}

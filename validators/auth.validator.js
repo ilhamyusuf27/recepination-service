@@ -1,31 +1,35 @@
-const { z } = require("zod");
+const { z } = require('zod')
 
-const registerSchema = z
-  .object({
-    name: z.string().min(3, "Name must be at least 3 characters"),
-    phone_number: z.string().optional().nullable(),
-    email: z.string().email("Invalid email"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    rePassword: z.string(),
-  })
-  .refine((data) => data.password === data.rePassword, {
-    message: "Password confirmation does not match",
-    path: ["rePassword"],
-  });
+const email = z.string().trim().toLowerCase().email('Invalid email')
+const password = z.string().min(8, 'Password must be at least 8 characters').max(128)
 
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .email("Invalid email format"),
+const registerSchema = z.object({
+  name: z.string().trim().min(3).max(100),
+  phone_number: z.string().trim().min(5).max(30).optional().nullable(),
+  email,
+  password,
+  rePassword: z.string()
+}).strict().refine((data) => data.password === data.rePassword, {
+  message: 'Password confirmation does not match',
+  path: ['rePassword']
+})
 
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Password must be at least 8 characters"),
-});
+const loginSchema = z.object({ email, password }).strict()
+const emailSchema = z.object({ email }).strict()
+const refreshTokenSchema = z.object({ refreshToken: z.string().min(32) }).strict()
+const resetPasswordSchema = z.object({
+  token: z.string().min(32),
+  password,
+  rePassword: z.string()
+}).strict().refine((data) => data.password === data.rePassword, {
+  message: 'Password confirmation does not match',
+  path: ['rePassword']
+})
 
 module.exports = {
   registerSchema,
   loginSchema,
-};
+  emailSchema,
+  refreshTokenSchema,
+  resetPasswordSchema
+}

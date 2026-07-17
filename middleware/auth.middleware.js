@@ -1,52 +1,35 @@
-require("dotenv").config();
-const jwt = require("jsonwebtoken");
+const jwt = require('jsonwebtoken')
+const prisma = require('../lib/prisma')
+const { env } = require('../config/env')
+const AppError = require('../utils/AppError')
 
-const authenticate = (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization
+    if (!authHeader?.startsWith('Bearer ')) throw new AppError('Access token required', 401)
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({
-        success: false,
-        message: "Access token required",
-      });
-    }
+    const decoded = jwt.verify(authHeader.slice(7), env.jwtSecret, {
+      issuer: 'recepination-service',
+      audience: 'recepination-web'
+    })
+    if (decoded.type !== 'access') throw new AppError('Invalid token type', 401)
 
-    const token = authHeader.split(" ")[1];
+    const user = await prisma.user.findUnique({
+      where: { user_id: decoded.user_id },
+      select: { user_id: true, role: true, is_verified: true }
+    })
+    if (!user || !user.is_verified) throw new AppError('Account is unavailable', 401)
 
-    const decoded = jwt.verify(token, process.env.SECRET_KEY);
-
-    req.user = decoded;
-
-    next();
+    req.user = user
+    next()
   } catch (error) {
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Token expired",
-      });
-    }
-
-    return res.status(401).json({
-      success: false,
-      message: "Invalid token",
-    });
+    next(error)
   }
-};
+}
 
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Forbidden",
-      });
-    }
-    next();
-  };
-};
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) return next(new AppError('Forbidden', 403))
+  next()
+}
 
-module.exports = {
-  authenticate,
-  authorize,
-};
+module.exports = { authenticate, authorize }
